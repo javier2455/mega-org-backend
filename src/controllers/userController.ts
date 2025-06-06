@@ -176,6 +176,11 @@ export const updateUser = async (
       findUser.password = await hashPassword(password);
     }
 
+    // Si se subió un archivo, guarda la URL, si no, deja undefined
+    if (req.file) {
+      findUser.avatarUrl = `/uploads/avatars/${req.file.filename}`;
+    }
+
     const updatedUser = await userRepository.save(findUser);
 
     return res.status(200).json({
@@ -186,6 +191,7 @@ export const updateUser = async (
         user: updatedUser.user,
         fullname: updatedUser.fullname,
         role: updatedUser.role,
+        avatarUrl: updatedUser.avatarUrl,
         updatedAt: updatedUser.updatedAt,
       },
     });

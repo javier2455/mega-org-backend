@@ -20,7 +20,7 @@ router.get("/:id", getUserById as RequestHandler);
 router.post("/", upload.single("avatar"), createUser as RequestHandler);
 
 // Ruta para actualizar un usuario por ID
-router.put("/:id", updateUser as RequestHandler);
+router.put("/:id", upload.single("avatar"), updateUser as RequestHandler);
 
 // Ruta para eliminar un usuario por ID
 router.delete("/:id", deleteUser as RequestHandler);
