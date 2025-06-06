@@ -1,37 +1,47 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
-import { Task } from './task';
-import { UserRole } from '../interfaces/user';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  OneToMany,
+} from "typeorm";
+import { Task } from "./task";
+import { UserRole } from "../interfaces/user";
 
 @Entity()
 export class User {
-    @PrimaryGeneratedColumn()
-    id: number;
+  @PrimaryGeneratedColumn()
+  id: number;
 
-    @Column()
-    fullname: string;
-    
-    @Column({ unique: true })
-    user: string;
+  @Column()
+  fullname: string;
 
-    @Column()
-    password: string;
+  @Column({ unique: true })
+  user: string;
 
-    @Column({
-        type: 'enum',
-        enum: UserRole,
-        default: UserRole.USER
-    })
-    role: UserRole;
+  @Column({ nullable: true })
+  avatarUrl: string;
 
-    @Column({ default: true })
-    active: boolean;
+  @Column()
+  password: string;
 
-    @OneToMany(() => Task, task => task.assignedTo)
-    tasks: Task[];
+  @Column({
+    type: "enum",
+    enum: UserRole,
+    default: UserRole.USER,
+  })
+  role: UserRole;
 
-    @CreateDateColumn()
-    createdAt: Date;
+  @Column({ default: true })
+  active: boolean;
 
-    @UpdateDateColumn()
-    updatedAt: Date;
-} 
+  @OneToMany(() => Task, (task) => task.assignedTo)
+  tasks: Task[];
+
+  @CreateDateColumn()
+  createdAt: Date;
+
+  @UpdateDateColumn()
+  updatedAt: Date;
+}

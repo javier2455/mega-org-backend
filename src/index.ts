@@ -16,6 +16,9 @@ app.use(express.json());
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
 
+// Ruta para servir archivos estáticos
+app.use("/uploads", express.static("src/uploads"));
+
 // Ruta de prueba
 app.get('/', (req, res) => {
     res.json({ message: 'Bienvenido a la API de Mega Organization' });

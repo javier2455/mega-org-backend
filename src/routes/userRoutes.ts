@@ -6,6 +6,7 @@ import {
   getUsers,
   updateUser,
 } from "../controllers/userController";
+import { upload } from "../utils/multerConfig";
 
 const router = Router();
 
@@ -16,7 +17,7 @@ router.get("/", getUsers as RequestHandler);
 router.get("/:id", getUserById as RequestHandler);
 
 // Ruta para crear un nuevo usuario
-router.post("/", createUser as RequestHandler);
+router.post("/", upload.single("avatar"), createUser as RequestHandler);
 
 // Ruta para actualizar un usuario por ID
 router.put("/:id", updateUser as RequestHandler);

@@ -3,6 +3,7 @@ import { AppDataSource } from "../config/database";
 import { User } from "../entities/user";
 import { hashPassword } from "../utils/passwordUtils";
 
+
 export const getUsers = async (
   req: Request,
   res: Response,
@@ -18,6 +19,7 @@ export const getUsers = async (
         fullname: true,
         user: true,
         role: true,
+        avatarUrl: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -51,6 +53,7 @@ export const getUserById = async (
         fullname: true,
         user: true,
         role: true,
+        avatarUrl: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -101,6 +104,9 @@ export const createUser = async (
       });
     }
 
+    // Si se subió un archivo, guarda la URL, si no, deja undefined
+    const avatarUrl = req.file ? `/uploads/avatars/${req.file.filename}` : undefined;
+
     // Hashear la contraseña antes de crear el usuario
     const hashedPassword = await hashPassword(password);
 
@@ -110,6 +116,7 @@ export const createUser = async (
       password: hashedPassword,
       fullname,
       role,
+      avatarUrl
     });
 
     // Guardar el usuario en la base de datos
@@ -123,6 +130,7 @@ export const createUser = async (
         user: savedUser.user,
         fullname: savedUser.fullname,
         role: savedUser.role,
+        avatarUrl: savedUser.avatarUrl,
       },
     });
   } catch (error) {
