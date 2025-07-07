@@ -13,12 +13,23 @@ export interface IProject {
   updatedAt: Date;
 }
 
+export interface ICreateProjectTask {
+  title: string;
+  description?: string;
+  notes?: string;
+  dueDate: Date;
+  status?: 'new' | 'pending' | 'in_progress' | 'completed' | 'in_review' | 'done';
+  priority?: 'low' | 'medium' | 'high' | 'critical';
+  assignedToId?: number;
+}
+
 export interface ICreateProject {
   title: string;
   description?: string;
   startDate: Date;
   dueDate: Date;
   userIds?: number[];
+  tasks?: ICreateProjectTask[];
 }
 
 export interface IUpdateProject {

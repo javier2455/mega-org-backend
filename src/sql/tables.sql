@@ -10,7 +10,7 @@ CREATE TABLE "user" (
 );
 
 -- Crear los tipos ENUM para las tareas
-CREATE TYPE "task_status_enum" AS ENUM('new', 'pending', 'in_progress', 'completed', 'in_review', 'done');
+CREATE TYPE "task_status_enum" AS ENUM('new', 'pending', 'in_progress', 'completed', 'in_review', 'closed');
 CREATE TYPE "task_priority_enum" AS ENUM('low', 'medium', 'high', 'urgent');
 
 -- Crear la tabla de tareas

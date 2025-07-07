@@ -5,7 +5,7 @@ export enum TaskStatus {
     IN_PROGRESS = 'in_progress',
     COMPLETED = 'completed',
     IN_REVIEW = 'in_review',
-    DONE = 'done'
+    CLOSED = 'closed'
 }
 
 // Enum para las prioridades
