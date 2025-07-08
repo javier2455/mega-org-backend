@@ -14,13 +14,11 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER || "postgres",
   password: process.env.DB_PASSWORD || "postgres",
   database: process.env.DB_NAME || "mega_org",
-  // synchronize: true, // Para desarrollo
-  synchronize: false, // En producción debe ser false
+  synchronize: isProd ? false : true, // En producción debe ser false
   logging: true,
-  // entities: ['src/entities/**/*.ts'],    // Para desarrollo
-  // migrations: ['src/migrations/**/*.ts'],    // Para desarrollo
-  // subscribers: ['src/subscribers/**/*.ts'],  // Para desarrollo
-  entities: ["dist/entities/**/*.js"],
-  migrations: ["dist/migrations/**/*.js"],
-  subscribers: ["dist/subscribers/**/*.js"],
+  entities: isProd ? ["dist/entities/**/*.js"] : ["src/entities/**/*.ts"],
+  migrations: isProd ? ["dist/migrations/**/*.js"] : ["src/migrations/**/*.ts"],
+  subscribers: isProd
+    ? ["dist/subscribers/**/*.js"]
+    : ["src/subscribers/**/*.ts"],
 });
