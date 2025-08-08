@@ -3,6 +3,7 @@ import { AppDataSource } from "../config/database";
 import { Task } from "../entities/task";
 import { User } from "../entities/user";
 import { TaskPriority, TaskStatus } from "../interfaces/task";
+import { Project } from "../entities/project";
 
 export const getTasks = async (
   req: Request,
@@ -23,7 +24,7 @@ export const getTasks = async (
         createdAt: true,
         updatedAt: true,
       },
-      relations: ['assignedTo']
+      relations: ['assignedTo', 'project']
     });
     res.status(200).json({
       success: true,
@@ -59,7 +60,7 @@ export const getTaskById = async (
         updatedAt: true,
       },
       where: { id: parseInt(id) },
-      relations: ['assignedTo']
+      relations: ['assignedTo', 'project']
     });
 
     if (!task) {
@@ -92,13 +93,14 @@ export const createTask = async (
       status,
       priority,
       assignedToId,
+      projectId,
     } = req.body;
 
     // Validar campos requeridos
-    if (!title || !dueDate || !assignedToId) {
+    if (!title || !dueDate || !assignedToId || !projectId) {
       return res.status(400).json({
         success: false,
-        message: "Título, fecha límite y usuario asignado son requeridos",
+        message: "Título, fecha límite, usuario asignado y proyecto son requeridos",
       });
     }
 
@@ -113,16 +115,36 @@ export const createTask = async (
       });
     }
     
-    // Crear la tarea
+    // Validar proyecto y pertenencia del usuario al proyecto
+    const projectRepository = AppDataSource.getRepository(Project);
+    const project = await projectRepository.findOne({ where: { id: Number(projectId) }, relations: ["users"] });
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Proyecto no encontrado",
+      });
+    }
+
+    const projectUserIds = project.users.map((u) => u.id);
+    if (!projectUserIds.includes(Number(assignedToId))) {
+      return res.status(400).json({
+        success: false,
+        message: `El usuario ${assignedToId} no está asignado al proyecto`,
+      });
+    }
+
+    // Crear la tarea con vínculo al proyecto
     const taskRepository = AppDataSource.getRepository(Task);
     const newTask = taskRepository.create({
       description,
-      dueDate,
+      dueDate: new Date(dueDate),
       status: status,
       priority: priority,
       title,
       notes: notes || "",
       assignedTo: assignedUser,
+      project,
     });
 
     const savedTask = await taskRepository.save(newTask);
@@ -151,6 +173,7 @@ export const updateTask = async (
     const taskRepository = AppDataSource.getRepository(Task);
     const task = await taskRepository.findOne({
       where: { id: parseInt(id) },
+      relations: ["project"],
     });
 
     if (!task) {
@@ -186,6 +209,19 @@ export const updateTask = async (
         return res.status(404).json({
           success: false,
           message: "Usuario asignado no encontrado",
+        });
+      }
+      // Validar pertenencia del usuario al proyecto de la tarea
+      const projectRepository = AppDataSource.getRepository(Project);
+      const project = await projectRepository.findOne({ where: { id: task.project.id }, relations: ["users"] });
+      if (!project) {
+        return res.status(404).json({ success: false, message: "Proyecto no encontrado" });
+      }
+      const projectUserIds = project.users.map((u) => u.id);
+      if (!projectUserIds.includes(Number(assignedToId))) {
+        return res.status(400).json({
+          success: false,
+          message: `El usuario ${assignedToId} no está asignado al proyecto de esta tarea`,
         });
       }
       task.assignedTo = assignedUser;

@@ -179,3 +179,178 @@ export const createProject = async (
     });
   }
 }; 
+
+export const updateProject = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const { title, description, startDate, dueDate, userIds } = req.body;
+
+    const projectRepository = AppDataSource.getRepository(Project);
+    const userRepository = AppDataSource.getRepository(User);
+
+    const project = await projectRepository.findOne({ where: { id: Number(id) }, relations: ["users"] });
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Proyecto no encontrado" });
+    }
+
+    if (!title && !description && !startDate && !dueDate && !userIds) {
+      return res.status(400).json({ success: false, message: "Debe proporcionar al menos un campo para actualizar" });
+    }
+
+    if (title) project.title = title;
+    if (description !== undefined) project.description = description;
+    if (startDate) project.startDate = new Date(startDate);
+    if (dueDate) project.dueDate = new Date(dueDate);
+
+    if (Array.isArray(userIds)) {
+      const users = await userRepository.findByIds(userIds);
+      if (users.length !== userIds.length) {
+        return res.status(400).json({ success: false, message: "Algunos usuarios no existen" });
+      }
+      project.users = users;
+    }
+
+    await projectRepository.save(project);
+
+    const projectWithRelations = await projectRepository.findOne({
+      where: { id: project.id },
+      relations: ["users", "tasks", "tasks.assignedTo"],
+    });
+
+    return res.status(200).json({ success: true, message: "Proyecto actualizado", data: projectWithRelations });
+  } catch (error) {
+    console.error("Error al actualizar proyecto:", error);
+    res.status(500).json({ success: false, message: "Error al actualizar el proyecto" });
+  }
+};
+
+export const deleteProject = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const projectRepository = AppDataSource.getRepository(Project);
+    const taskRepository = AppDataSource.getRepository(Task);
+
+    const project = await projectRepository.findOne({ where: { id: Number(id) } });
+    if (!project) {
+      return res.status(404).json({ success: false, message: "Proyecto no encontrado" });
+    }
+
+    // Eliminar tareas del proyecto primero para evitar conflictos de FK
+    const tasks = await taskRepository.find({ where: { project: { id: Number(id) } } });
+    if (tasks.length > 0) {
+      await taskRepository.remove(tasks);
+    }
+
+    await projectRepository.remove(project);
+
+    return res.status(200).json({ success: true, message: "Proyecto eliminado exitosamente" });
+  } catch (error) {
+    console.error("Error al eliminar proyecto:", error);
+    res.status(500).json({ success: false, message: "Error al eliminar el proyecto" });
+  }
+};
+
+export const createProjectTask = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      notes,
+      dueDate,
+      status,
+      priority,
+      assignedToId,
+    } = req.body;
+
+    // Validaciones básicas
+    if (!title || !dueDate || !assignedToId) {
+      return res.status(400).json({
+        success: false,
+        message: "Título, fecha límite y usuario asignado son requeridos",
+      });
+    }
+
+    const projectRepository = AppDataSource.getRepository(Project);
+    const userRepository = AppDataSource.getRepository(User);
+    const taskRepository = AppDataSource.getRepository(Task);
+
+    // Cargar proyecto con usuarios para validar pertenencia
+    const project = await projectRepository.findOne({
+      where: { id: Number(id) },
+      relations: ["users"],
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Proyecto no encontrado",
+      });
+    }
+
+    // Verificar que el usuario exista
+    const assignedUser = await userRepository.findOne({
+      where: { id: Number(assignedToId) },
+    });
+
+    if (!assignedUser) {
+      return res.status(400).json({
+        success: false,
+        message: "El usuario asignado no existe",
+      });
+    }
+
+    // Validar que el usuario asignado pertenezca al proyecto
+    const projectUserIds = project.users.map((u) => u.id);
+    if (!projectUserIds.includes(Number(assignedToId))) {
+      return res.status(400).json({
+        success: false,
+        message: `El usuario ${assignedToId} no está asignado al proyecto`,
+      });
+    }
+
+    // Crear la tarea
+    const newTask = taskRepository.create({
+      title,
+      description,
+      notes,
+      dueDate: new Date(dueDate),
+      status: status || TaskStatus.NEW,
+      priority: priority || TaskPriority.MEDIUM,
+      assignedTo: assignedUser,
+      project,
+    });
+
+    const savedTask = await taskRepository.save(newTask);
+
+    // Recuperar con relaciones útiles
+    const taskWithRelations = await taskRepository.findOne({
+      where: { id: savedTask.id },
+      relations: ["assignedTo"],
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Tarea creada exitosamente en el proyecto",
+      data: taskWithRelations,
+    });
+  } catch (error) {
+    console.error("Error al crear tarea en proyecto:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error al crear la tarea en el proyecto",
+    });
+  }
+};
