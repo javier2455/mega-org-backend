@@ -5,6 +5,37 @@ import { User } from "../entities/user";
 import { Task } from "../entities/task";
 import { TaskPriority, TaskStatus } from "../interfaces/task";
 
+function toDateString(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === "string") {
+    // Asumimos formato YYYY-MM-DD
+    return value.slice(0, 10);
+  }
+  const d = value;
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function normalizeDateInput(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value.slice(0, 10);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function serializeProject(project: Project): any {
+  return {
+    ...project,
+    startDate: toDateString(project.startDate),
+    dueDate: toDateString(project.dueDate),
+    tasks: project.tasks
+      ? project.tasks.map((t) => ({
+          ...t,
+          dueDate: toDateString(t.dueDate),
+        }))
+      : [],
+  };
+}
 export const getProjects = async (
   req: Request,
   res: Response,
@@ -25,10 +56,7 @@ export const getProjects = async (
       relations: ['users', 'tasks']
     });
 
-    res.status(200).json({
-      success: true,
-      data: projects,
-    });
+    res.status(200).json({ success: true, data: projects.map(serializeProject) });
   } catch (error) {
     console.error("Error al obtener proyectos:", error);
     res.status(500).json({
@@ -59,10 +87,7 @@ export const getProjectById = async (
       });
     }
 
-    res.status(200).json({
-      success: true,
-      data: project,
-    });
+    res.status(200).json({ success: true, data: serializeProject(project) });
   } catch (error) {
     console.error("Error al obtener el proyecto:", error);
     res.status(500).json({
@@ -115,9 +140,9 @@ export const createProject = async (
     const newProject = projectRepository.create({
       title,
       description,
-      startDate: new Date(startDate),
-      dueDate: new Date(dueDate),
-      users
+      startDate: normalizeDateInput(startDate),
+      dueDate: normalizeDateInput(dueDate),
+      users,
     });
 
     const savedProject = await projectRepository.save(newProject);
@@ -149,11 +174,11 @@ export const createProject = async (
           title: taskData.title,
           description: taskData.description,
           notes: taskData.notes,
-          dueDate: new Date(taskData.dueDate),
+          dueDate: normalizeDateInput(taskData.dueDate),
           status: taskData.status || TaskStatus.NEW,
           priority: taskData.priority || TaskPriority.MEDIUM,
           ...(assignedUser && { assignedTo: assignedUser }),
-          project: savedProject
+          project: savedProject,
         });
 
         await taskRepository.save(newTask);
@@ -166,11 +191,7 @@ export const createProject = async (
       relations: ['users', 'tasks', 'tasks.assignedTo']
     });
 
-    return res.status(201).json({
-      success: true,
-      message: "Proyecto creado exitosamente",
-      data: projectWithRelations,
-    });
+    return res.status(201).json({ success: true, message: "Proyecto creado exitosamente", data: projectWithRelations ? serializeProject(projectWithRelations) : null });
   } catch (error) {
     console.error("Error al crear proyecto:", error);
     res.status(500).json({
@@ -203,8 +224,8 @@ export const updateProject = async (
 
     if (title) project.title = title;
     if (description !== undefined) project.description = description;
-    if (startDate) project.startDate = new Date(startDate);
-    if (dueDate) project.dueDate = new Date(dueDate);
+    if (startDate) project.startDate = normalizeDateInput(startDate);
+    if (dueDate) project.dueDate = normalizeDateInput(dueDate);
 
     if (Array.isArray(userIds)) {
       const users = await userRepository.findByIds(userIds);
@@ -221,7 +242,7 @@ export const updateProject = async (
       relations: ["users", "tasks", "tasks.assignedTo"],
     });
 
-    return res.status(200).json({ success: true, message: "Proyecto actualizado", data: projectWithRelations });
+    return res.status(200).json({ success: true, message: "Proyecto actualizado", data: projectWithRelations ? serializeProject(projectWithRelations) : null });
   } catch (error) {
     console.error("Error al actualizar proyecto:", error);
     res.status(500).json({ success: false, message: "Error al actualizar el proyecto" });
@@ -326,7 +347,7 @@ export const createProjectTask = async (
       title,
       description,
       notes,
-      dueDate: new Date(dueDate),
+      dueDate: normalizeDateInput(dueDate),
       status: status || TaskStatus.NEW,
       priority: priority || TaskPriority.MEDIUM,
       assignedTo: assignedUser,
@@ -341,11 +362,7 @@ export const createProjectTask = async (
       relations: ["assignedTo"],
     });
 
-    return res.status(201).json({
-      success: true,
-      message: "Tarea creada exitosamente en el proyecto",
-      data: taskWithRelations,
-    });
+    return res.status(201).json({ success: true, message: "Tarea creada exitosamente en el proyecto", data: taskWithRelations ? { ...taskWithRelations, dueDate: toDateString(taskWithRelations.dueDate) } : null });
   } catch (error) {
     console.error("Error al crear tarea en proyecto:", error);
     res.status(500).json({

@@ -19,7 +19,7 @@ export class Task {
     notes: string;
 
     @Column({ type: 'date' })
-    dueDate: Date;
+    dueDate: string;
 
     @Column({
         type: 'enum',

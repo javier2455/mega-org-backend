@@ -4,6 +4,20 @@ import { Task } from "../entities/task";
 import { User } from "../entities/user";
 import { TaskPriority, TaskStatus } from "../interfaces/task";
 import { Project } from "../entities/project";
+function toDateString(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  if (typeof value === "string") return value.slice(0, 10);
+  const d = value;
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString().slice(0, 10);
+}
+
+function normalizeDateInput(value: unknown): string {
+  if (!value) return "";
+  if (typeof value === "string") return value.slice(0, 10);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
 
 export const getTasks = async (
   req: Request,
@@ -26,10 +40,7 @@ export const getTasks = async (
       },
       relations: ['assignedTo', 'project']
     });
-    res.status(200).json({
-      success: true,
-      data: tasks,
-    });
+    res.status(200).json({ success: true, data: tasks.map((t) => ({ ...t, dueDate: toDateString(t.dueDate) })) });
   } catch (error) {
     console.error("Error al obtener tareas:", error);
     res.status(500).json({
@@ -70,10 +81,7 @@ export const getTaskById = async (
       });
     }
 
-    return res.status(200).json({
-      success: true,
-      data: task,
-    });
+    return res.status(200).json({ success: true, data: task ? { ...task, dueDate: toDateString(task.dueDate) } : null });
   } catch (error) {
     next(error);
   }
@@ -138,7 +146,7 @@ export const createTask = async (
     const taskRepository = AppDataSource.getRepository(Task);
     const newTask = taskRepository.create({
       description,
-      dueDate: new Date(dueDate),
+      dueDate: normalizeDateInput(dueDate),
       status: status,
       priority: priority,
       title,
@@ -148,12 +156,7 @@ export const createTask = async (
     });
 
     const savedTask = await taskRepository.save(newTask);
-
-    return res.status(201).json({
-      success: true,
-      message: "Tarea creada exitosamente",
-      data: savedTask,
-    });
+    return res.status(201).json({ success: true, message: "Tarea creada exitosamente", data: savedTask });
   } catch (error) {
     console.error("Error al crear tarea:", error);
     res.status(500).json({
@@ -197,7 +200,7 @@ export const updateTask = async (
     if (title) task.title = title;
     if (description) task.description = description;
     if (notes) task.notes = notes;
-    if (dueDate) task.dueDate = new Date(dueDate);
+    if (dueDate) task.dueDate = normalizeDateInput(dueDate);
     if (status) task.status = status;
     if (priority) task.priority = priority;
     if (assignedToId) {
@@ -228,12 +231,7 @@ export const updateTask = async (
     }
 
     const updatedTask = await taskRepository.save(task);
-
-    return res.status(200).json({
-      success: true,
-      message: "Tarea actualizada exitosamente",
-      data: updatedTask,
-    });
+    return res.status(200).json({ success: true, message: "Tarea actualizada exitosamente", data: updatedTask });
   } catch (error) {
     next(error);
   }

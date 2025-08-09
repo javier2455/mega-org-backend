@@ -14,10 +14,10 @@ export class Project {
   description: string;
 
   @Column({ type: 'date' })
-  startDate: Date;
+  startDate: string;
 
   @Column({ type: 'date' })
-  dueDate: Date;
+  dueDate: string;
 
   @ManyToMany(() => User)
   @JoinTable({
