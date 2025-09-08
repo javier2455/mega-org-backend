@@ -2,7 +2,6 @@ import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
 import { Task } from "../entities/task";
 import { User } from "../entities/user";
-import { TaskPriority, TaskStatus } from "../interfaces/task";
 import { Project } from "../entities/project";
 function toDateString(value: Date | string | null | undefined): string | null {
   if (!value) return null;
