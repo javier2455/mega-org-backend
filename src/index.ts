@@ -5,6 +5,8 @@ import { AppDataSource } from './config/database';
 import userRoutes from './routes/userRoutes';
 import taskRoutes from './routes/taskRoutes';
 import projectRoutes from './routes/projectRoutes';
+import { ensureUploadsDirectories } from './utils/uploadDirectories';
+
 
 // Crear la aplicación Express
 const app = express();
@@ -19,6 +21,7 @@ app.use('/api/tasks', taskRoutes);
 app.use('/api/projects', projectRoutes);
 
 // Ruta para servir archivos estáticos
+ensureUploadsDirectories();
 app.use("/uploads", express.static("src/uploads"));
 
 // Ruta de prueba
