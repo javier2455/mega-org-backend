@@ -5,6 +5,7 @@ import { AppDataSource } from './config/database';
 import userRoutes from './routes/userRoutes';
 import taskRoutes from './routes/taskRoutes';
 import projectRoutes from './routes/projectRoutes';
+import dashboardRoutes from './routes/dashboardRoutes';
 import { ensureUploadsDirectories } from './utils/uploadDirectories';
 
 
@@ -19,6 +20,7 @@ app.use(express.json());
 app.use('/api/users', userRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/projects', projectRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Ruta para servir archivos estáticos
 ensureUploadsDirectories();
