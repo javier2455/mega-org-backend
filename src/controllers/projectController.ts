@@ -69,6 +69,7 @@ export const getProjects = async (
     res.status(500).json({
       success: false,
       message: "Error al obtener los proyectos",
+      message2: error instanceof Error ? error.message : "Error desconocido",
     });
   }
 };
