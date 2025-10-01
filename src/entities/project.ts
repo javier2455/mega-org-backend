@@ -1,6 +1,16 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToMany, OneToMany, JoinTable } from "typeorm";
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  ManyToMany,
+  OneToMany,
+  JoinTable,
+} from "typeorm";
 import { User } from "./user";
 import { Task } from "./task";
+import { Issue } from "./issues";
 
 @Entity()
 export class Project {
@@ -13,26 +23,29 @@ export class Project {
   @Column({ nullable: true })
   description: string;
 
-  @Column({ type: 'date' })
+  @Column({ type: "date" })
   startDate: string;
 
-  @Column({ type: 'date' })
+  @Column({ type: "date" })
   dueDate: string;
 
   @ManyToMany(() => User)
   @JoinTable({
     name: "project_users",
     joinColumn: { name: "project_id", referencedColumnName: "id" },
-    inverseJoinColumn: { name: "user_id", referencedColumnName: "id" }
+    inverseJoinColumn: { name: "user_id", referencedColumnName: "id" },
   })
   users: User[];
 
-  @OneToMany(() => Task, task => task.project)
+  @OneToMany(() => Task, (task) => task.project)
   tasks: Task[];
+
+  @OneToMany(() => Issue, (issue) => issue.project)
+  issues: Issue[];
 
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
-} 
+}

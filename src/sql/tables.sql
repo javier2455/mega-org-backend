@@ -25,3 +25,17 @@ CREATE TABLE "task" (
     "createdAt" TIMESTAMP DEFAULT now(),
     "updatedAt" TIMESTAMP DEFAULT now()
 ); 
+
+CREATE TABLE "issue" (
+    "id" SERIAL PRIMARY KEY,
+    "title" VARCHAR NOT NULL,
+    "description" TEXT,
+    "notes" TEXT,
+    "dueDate" DATE NOT NULL,
+    "status" task_status_enum DEFAULT 'new',
+    "priority" task_priority_enum DEFAULT 'medium',
+    "assigned_to_id" INTEGER REFERENCES "user"("id"),
+    "project_id" INTEGER REFERENCES "project"("id") ON DELETE CASCADE,
+    "createdAt" TIMESTAMP DEFAULT now(),
+    "updatedAt" TIMESTAMP DEFAULT now()
+);

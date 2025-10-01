@@ -3,6 +3,7 @@ import { AppDataSource } from "../config/database";
 import { Project } from "../entities/project";
 import { User } from "../entities/user";
 import { Task } from "../entities/task";
+import { Issue } from "../entities/issues";
 import { TaskPriority, TaskStatus } from "../interfaces/task";
 
 function toDateString(value: Date | string | null | undefined): string | null {
@@ -34,6 +35,12 @@ function serializeProject(project: Project): any {
           dueDate: toDateString(t.dueDate),
         }))
       : [],
+    issues: project.issues
+      ? project.issues.map((i) => ({
+          ...i,
+          dueDate: toDateString(i.dueDate),
+        }))
+      : [],
   };
 }
 export const getProjects = async (
@@ -53,7 +60,7 @@ export const getProjects = async (
         createdAt: true,
         updatedAt: true,
       },
-      relations: ['users', 'tasks']
+      relations: ['users', 'tasks', 'issues']
     });
 
     res.status(200).json({ success: true, data: projects.map(serializeProject) });
@@ -77,7 +84,7 @@ export const getProjectById = async (
 
     const project = await projectRepository.findOne({
       where: { id: Number(id) },
-      relations: ['users', 'tasks', 'tasks.assignedTo']
+      relations: ['users', 'tasks', 'tasks.assignedTo', 'issues', 'issues.assignedTo']
     });
 
     if (!project) {
@@ -109,7 +116,8 @@ export const createProject = async (
       startDate,
       dueDate,
       userIds,
-      tasks
+      tasks,
+      issues
     } = req.body;
 
     // Validar campos requeridos
@@ -123,6 +131,7 @@ export const createProject = async (
     const projectRepository = AppDataSource.getRepository(Project);
     const userRepository = AppDataSource.getRepository(User);
     const taskRepository = AppDataSource.getRepository(Task);
+    const issueRepository = AppDataSource.getRepository(Issue);
 
     // Verificar que los usuarios existan si se proporcionan
     let users: User[] = [];
@@ -185,10 +194,48 @@ export const createProject = async (
       }
     }
 
+    // Crear las issues si se proporcionan
+    if (issues && issues.length > 0) {
+      for (const issueData of issues) {
+        // Validar campos requeridos de la issue
+        if (!issueData.title || !issueData.dueDate) {
+          return res.status(400).json({
+            success: false,
+            message: "Título y fecha límite son requeridos para cada issue",
+          });
+        }
+
+        // Verificar que el usuario asignado esté en el proyecto
+        if (issueData.assignedToId && !userIds.includes(issueData.assignedToId)) {
+          return res.status(400).json({
+            success: false,
+            message: `El usuario ${issueData.assignedToId} no está asignado al proyecto`,
+          });
+        }
+
+        const assignedUser = issueData.assignedToId 
+          ? await userRepository.findOne({ where: { id: issueData.assignedToId } })
+          : null;
+
+        const newIssue = issueRepository.create({
+          title: issueData.title,
+          description: issueData.description,
+          notes: issueData.notes,
+          dueDate: normalizeDateInput(issueData.dueDate),
+          status: issueData.status || TaskStatus.NEW,
+          priority: issueData.priority || TaskPriority.MEDIUM,
+          ...(assignedUser && { assignedTo: assignedUser }),
+          project: savedProject,
+        });
+
+        await issueRepository.save(newIssue);
+      }
+    }
+
     // Obtener el proyecto con todas las relaciones
     const projectWithRelations = await projectRepository.findOne({
       where: { id: savedProject.id },
-      relations: ['users', 'tasks', 'tasks.assignedTo']
+      relations: ['users', 'tasks', 'tasks.assignedTo', 'issues', 'issues.assignedTo']
     });
 
     return res.status(201).json({ success: true, message: "Proyecto creado exitosamente", data: projectWithRelations ? serializeProject(projectWithRelations) : null });
@@ -239,7 +286,7 @@ export const updateProject = async (
 
     const projectWithRelations = await projectRepository.findOne({
       where: { id: project.id },
-      relations: ["users", "tasks", "tasks.assignedTo"],
+      relations: ["users", "tasks", "tasks.assignedTo", "issues", "issues.assignedTo"],
     });
 
     return res.status(200).json({ success: true, message: "Proyecto actualizado", data: projectWithRelations ? serializeProject(projectWithRelations) : null });
@@ -258,6 +305,7 @@ export const deleteProject = async (
     const { id } = req.params;
     const projectRepository = AppDataSource.getRepository(Project);
     const taskRepository = AppDataSource.getRepository(Task);
+    const issueRepository = AppDataSource.getRepository(Issue);
 
     const project = await projectRepository.findOne({ where: { id: Number(id) } });
     if (!project) {
@@ -268,6 +316,12 @@ export const deleteProject = async (
     const tasks = await taskRepository.find({ where: { project: { id: Number(id) } } });
     if (tasks.length > 0) {
       await taskRepository.remove(tasks);
+    }
+
+    // Eliminar issues del proyecto para evitar conflictos de FK
+    const issues = await issueRepository.find({ where: { project: { id: Number(id) } } });
+    if (issues.length > 0) {
+      await issueRepository.remove(issues);
     }
 
     await projectRepository.remove(project);
@@ -368,6 +422,99 @@ export const createProjectTask = async (
     res.status(500).json({
       success: false,
       message: "Error al crear la tarea en el proyecto",
+    });
+  }
+};
+
+export const createProjectIssue = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      notes,
+      dueDate,
+      status,
+      priority,
+      assignedToId,
+    } = req.body;
+
+    // Validaciones básicas
+    if (!title || !dueDate || !assignedToId) {
+      return res.status(400).json({
+        success: false,
+        message: "Título, fecha límite y usuario asignado son requeridos",
+      });
+    }
+
+    const projectRepository = AppDataSource.getRepository(Project);
+    const userRepository = AppDataSource.getRepository(User);
+    const issueRepository = AppDataSource.getRepository(Issue);
+
+    // Cargar proyecto con usuarios para validar pertenencia
+    const project = await projectRepository.findOne({
+      where: { id: Number(id) },
+      relations: ["users"],
+    });
+
+    if (!project) {
+      return res.status(404).json({
+        success: false,
+        message: "Proyecto no encontrado",
+      });
+    }
+
+    // Verificar que el usuario exista
+    const assignedUser = await userRepository.findOne({
+      where: { id: Number(assignedToId) },
+    });
+
+    if (!assignedUser) {
+      return res.status(400).json({
+        success: false,
+        message: "El usuario asignado no existe",
+      });
+    }
+
+    // Validar que el usuario asignado pertenezca al proyecto
+    const projectUserIds = project.users.map((u) => u.id);
+    if (!projectUserIds.includes(Number(assignedToId))) {
+      return res.status(400).json({
+        success: false,
+        message: `El usuario ${assignedToId} no está asignado al proyecto`,
+      });
+    }
+
+    // Crear la issue
+    const newIssue = issueRepository.create({
+      title,
+      description,
+      notes,
+      dueDate: normalizeDateInput(dueDate),
+      status: status || TaskStatus.NEW,
+      priority: priority || TaskPriority.MEDIUM,
+      assignedTo: assignedUser,
+      project,
+    });
+
+    const savedIssue = await issueRepository.save(newIssue);
+
+    // Recuperar con relaciones útiles
+    const issueWithRelations = await issueRepository.findOne({
+      where: { id: savedIssue.id },
+      relations: ["assignedTo"],
+    });
+
+    return res.status(201).json({ success: true, message: "Issue creada exitosamente en el proyecto", data: issueWithRelations ? { ...issueWithRelations, dueDate: toDateString(issueWithRelations.dueDate) } : null });
+  } catch (error) {
+    console.error("Error al crear issue en proyecto:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error al crear la issue en el proyecto",
     });
   }
 };

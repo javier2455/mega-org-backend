@@ -1,5 +1,5 @@
 import { Router, RequestHandler } from "express";
-import { getProjects, createProject, getProjectById, createProjectTask, updateProject, deleteProject } from "../controllers/projectController";
+import { getProjects, createProject, getProjectById, createProjectTask, createProjectIssue, updateProject, deleteProject } from "../controllers/projectController";
 
 const router = Router();
 
@@ -9,5 +9,6 @@ router.post("/", createProject as RequestHandler);
 router.put("/:id", updateProject as RequestHandler);
 router.delete("/:id", deleteProject as RequestHandler);
 router.post("/:id/tasks", createProjectTask as RequestHandler);
+router.post("/:id/issues", createProjectIssue as RequestHandler);
 
 export default router;
