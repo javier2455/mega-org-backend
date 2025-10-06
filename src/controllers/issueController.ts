@@ -176,7 +176,7 @@ export const updateIssue = async (
     const issueRepository = AppDataSource.getRepository(Issue);
     const issue = await issueRepository.findOne({
       where: { id: parseInt(id) },
-      relations: ["project"],
+      relations: ["project", "assignedTo"],
     });
 
     if (!issue) {
@@ -230,8 +230,30 @@ export const updateIssue = async (
       issue.assignedTo = assignedUser;
     }
 
-    const updatedIssue = await issueRepository.save(issue);
-    return res.status(200).json({ success: true, message: "Issue actualizada exitosamente", data: updatedIssue });
+    await issueRepository.save(issue);
+    
+    // Recargar la issue con todas las relaciones y campos completos
+    const updatedIssue = await issueRepository.findOne({
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        notes: true,
+        dueDate: true,
+        status: true,
+        priority: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      where: { id: parseInt(id) },
+      relations: ['assignedTo', 'project']
+    });
+    
+    return res.status(200).json({ 
+      success: true, 
+      message: "Issue actualizada exitosamente", 
+      data: updatedIssue ? { ...updatedIssue, dueDate: toDateString(updatedIssue.dueDate) } : null 
+    });
   } catch (error) {
     next(error);
   }
