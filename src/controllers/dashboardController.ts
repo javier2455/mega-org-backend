@@ -2,17 +2,42 @@ import { RequestHandler } from 'express';
 import { AppDataSource } from '../config/database';
 import { Project } from '../entities/project';
 import { Task } from '../entities/task';
-import { User } from '../entities/user';
 import { TaskStatus } from '../interfaces/task';
 
 export const getDashboardStats: RequestHandler = async (req, res) => {
   try {
+    // Obtener el userId del query parameter
+    const userId = req.query.userId ? Number(req.query.userId) : null;
+    
     const projectRepo = AppDataSource.getRepository(Project);
     const taskRepo = AppDataSource.getRepository(Task);
-    const userRepo = AppDataSource.getRepository(User);
 
-    const [projectsCount, pendingTasksCount, completedTasksCount, usersCount] =
-      await Promise.all([
+    let projectsCount, pendingTasksCount, completedTasksCount;
+
+    if (userId) {
+      // Filtrar por proyectos del usuario
+      [projectsCount, pendingTasksCount, completedTasksCount] = await Promise.all([
+        projectRepo.count({ where: { userId } }),
+        taskRepo
+          .createQueryBuilder('task')
+          .leftJoin('task.project', 'project')
+          .where('project.userId = :userId', { userId })
+          .andWhere('task.status IN (:...statuses)', {
+            statuses: [TaskStatus.NEW, TaskStatus.IN_PROGRESS, TaskStatus.IN_REVIEW],
+          })
+          .getCount(),
+        taskRepo
+          .createQueryBuilder('task')
+          .leftJoin('task.project', 'project')
+          .where('project.userId = :userId', { userId })
+          .andWhere('task.status IN (:...statuses)', {
+            statuses: [TaskStatus.COMPLETED, TaskStatus.CLOSED],
+          })
+          .getCount(),
+      ]);
+    } else {
+      // Si no se proporciona userId, retornar todos (compatibilidad hacia atrás)
+      [projectsCount, pendingTasksCount, completedTasksCount] = await Promise.all([
         projectRepo.count(),
         taskRepo.count({
           where: [
@@ -22,15 +47,15 @@ export const getDashboardStats: RequestHandler = async (req, res) => {
           ],
         }),
         taskRepo.count({ where: [{ status: TaskStatus.COMPLETED }, { status: TaskStatus.CLOSED }] }),
-        userRepo.count(),
       ]);
+    }
 
     res.status(200).json({
       success: true,
       data: {
         activeProjects: projectsCount,
         pendingTasks: pendingTasksCount,
-        teamMembers: usersCount,
+        teamMembers: 1, // Ya no hay múltiples usuarios, siempre es 1
         completedTasks: completedTasksCount,
       },
     });

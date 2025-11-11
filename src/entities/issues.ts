@@ -1,5 +1,3 @@
-// Archivo: mega-org-backend/src/entities/issue.ts (NUEVO)
-
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -9,7 +7,6 @@ import {
   ManyToOne,
   JoinColumn,
 } from "typeorm";
-import { User } from "./user";
 import { TaskPriority, TaskStatus } from "../interfaces/task";
 import { Project } from "./project";
 
@@ -43,10 +40,6 @@ export class Issue {
     default: TaskPriority.MEDIUM,
   })
   priority: TaskPriority;
-
-  @ManyToOne(() => User)
-  @JoinColumn({ name: "assigned_to_id" })
-  assignedTo: User;
 
   @ManyToOne(() => Project, (project) => project.issues)
   @JoinColumn({ name: "project_id" })

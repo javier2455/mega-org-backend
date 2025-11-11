@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
 import { Issue } from "../entities/issues";
-import { User } from "../entities/user";
 import { Project } from "../entities/project";
 
 function toDateString(value: Date | string | null | undefined): string | null {
@@ -38,7 +37,7 @@ export const getIssues = async (
         createdAt: true,
         updatedAt: true,
       },
-      relations: ['assignedTo', 'project']
+      relations: ['project']
     });
     res.status(200).json({ success: true, data: issues.map((i) => ({ ...i, dueDate: toDateString(i.dueDate) })) });
   } catch (error) {
@@ -71,7 +70,7 @@ export const getIssueById = async (
         updatedAt: true,
       },
       where: { id: parseInt(id) },
-      relations: ['assignedTo', 'project']
+      relations: ['project']
     });
 
     if (!issue) {
@@ -100,45 +99,25 @@ export const createIssue = async (
       dueDate,
       status,
       priority,
-      assignedToId,
       projectId,
     } = req.body;
 
     // Validar campos requeridos
-    if (!title || !dueDate || !assignedToId || !projectId) {
+    if (!title || !dueDate || !projectId) {
       return res.status(400).json({
         success: false,
-        message: "Título, fecha límite, usuario asignado y proyecto son requeridos",
-      });
-    }
-
-    // Verificar que el usuario exista
-    const userRepository = AppDataSource.getRepository(User);
-    const assignedUser = await userRepository.findOne({ where: { id: assignedToId } });
-
-    if (!assignedUser) {
-      return res.status(400).json({
-        success: false,
-        message: "El usuario asignado no existe",
+        message: "Título, fecha límite y proyecto son requeridos",
       });
     }
     
-    // Validar proyecto y pertenencia del usuario al proyecto
+    // Validar proyecto
     const projectRepository = AppDataSource.getRepository(Project);
-    const project = await projectRepository.findOne({ where: { id: Number(projectId) }, relations: ["users"] });
+    const project = await projectRepository.findOne({ where: { id: Number(projectId) } });
 
     if (!project) {
       return res.status(404).json({
         success: false,
         message: "Proyecto no encontrado",
-      });
-    }
-
-    const projectUserIds = project.users.map((u) => u.id);
-    if (!projectUserIds.includes(Number(assignedToId))) {
-      return res.status(400).json({
-        success: false,
-        message: `El usuario ${assignedToId} no está asignado al proyecto`,
       });
     }
 
@@ -151,7 +130,6 @@ export const createIssue = async (
       priority: priority,
       title,
       notes: notes || "",
-      assignedTo: assignedUser,
       project,
     });
 
@@ -176,7 +154,7 @@ export const updateIssue = async (
     const issueRepository = AppDataSource.getRepository(Issue);
     const issue = await issueRepository.findOne({
       where: { id: parseInt(id) },
-      relations: ["project", "assignedTo"],
+      relations: ["project"],
     });
 
     if (!issue) {
@@ -186,10 +164,10 @@ export const updateIssue = async (
       });
     }
 
-    const { title, description, notes, dueDate, status, priority, assignedToId } = req.body;
+    const { title, description, notes, dueDate, status, priority } = req.body;
 
     // Verificar que al menos un campo esté presente para actualizar
-    if (!title && !description && !notes && !dueDate && !status && !priority && !assignedToId) {
+    if (!title && !description && !notes && !dueDate && !status && !priority) {
       return res.status(400).json({
         success: false,
         message: "Debe proporcionar al menos un campo para actualizar",
@@ -203,32 +181,6 @@ export const updateIssue = async (
     if (dueDate) issue.dueDate = normalizeDateInput(dueDate);
     if (status) issue.status = status;
     if (priority) issue.priority = priority;
-    if (assignedToId) {
-      const userRepository = AppDataSource.getRepository(User);
-      const assignedUser = await userRepository.findOne({
-        where: { id: parseInt(assignedToId) },
-      });
-      if (!assignedUser) {
-        return res.status(404).json({
-          success: false,
-          message: "Usuario asignado no encontrado",
-        });
-      }
-      // Validar pertenencia del usuario al proyecto de la issue
-      const projectRepository = AppDataSource.getRepository(Project);
-      const project = await projectRepository.findOne({ where: { id: issue.project.id }, relations: ["users"] });
-      if (!project) {
-        return res.status(404).json({ success: false, message: "Proyecto no encontrado" });
-      }
-      const projectUserIds = project.users.map((u) => u.id);
-      if (!projectUserIds.includes(Number(assignedToId))) {
-        return res.status(400).json({
-          success: false,
-          message: `El usuario ${assignedToId} no está asignado al proyecto de esta issue`,
-        });
-      }
-      issue.assignedTo = assignedUser;
-    }
 
     await issueRepository.save(issue);
     
@@ -246,7 +198,7 @@ export const updateIssue = async (
         updatedAt: true,
       },
       where: { id: parseInt(id) },
-      relations: ['assignedTo', 'project']
+      relations: ['project']
     });
     
     return res.status(200).json({ 

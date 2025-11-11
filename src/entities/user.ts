@@ -4,9 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  OneToMany,
 } from "typeorm";
-import { Task } from "./task";
 import { UserRole } from "../interfaces/user";
 
 @Entity()
@@ -35,9 +33,6 @@ export class User {
 
   @Column({ default: true })
   active: boolean;
-
-  @OneToMany(() => Task, (task) => task.assignedTo)
-  tasks: Task[];
 
   @CreateDateColumn()
   createdAt: Date;

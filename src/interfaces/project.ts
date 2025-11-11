@@ -1,4 +1,3 @@
-import { User } from "../entities/user";
 import { Task } from "../entities/task";
 import { Issue } from "../entities/issues";
 
@@ -8,9 +7,9 @@ export interface IProject {
   description?: string;
   startDate: Date;
   dueDate: Date;
-  users: User[];
+  userId: number;
   tasks: Task[];
-  issues: Issue[]; // <-- NUEVO
+  issues: Issue[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,7 +21,6 @@ export interface ICreateProjectTask {
   dueDate: Date;
   status?: "new" | "in_progress" | "completed" | "in_review" | "done";
   priority?: "low" | "medium" | "high" | "critical";
-  assignedToId?: number;
 }
 
 export interface ICreateProjectIssue {
@@ -32,7 +30,6 @@ export interface ICreateProjectIssue {
   dueDate: Date;
   status?: "new" | "in_progress" | "completed" | "in_review" | "closed";
   priority?: "low" | "medium" | "high" | "critical";
-  assignedToId?: number;
 }
 
 export interface ICreateProject {
@@ -40,7 +37,7 @@ export interface ICreateProject {
   description?: string;
   startDate: Date;
   dueDate: Date;
-  userIds?: number[];
+  userId: number;
   tasks?: ICreateProjectTask[];
   issues?: ICreateProjectIssue[];
 }
@@ -50,5 +47,4 @@ export interface IUpdateProject {
   description?: string;
   startDate?: Date;
   dueDate?: Date;
-  userIds?: number[];
 }

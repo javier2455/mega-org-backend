@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { AppDataSource } from "../config/database";
 import { Project } from "../entities/project";
-import { User } from "../entities/user";
 import { Task } from "../entities/task";
 import { Issue } from "../entities/issues";
 import { TaskPriority, TaskStatus } from "../interfaces/task";
@@ -49,19 +48,24 @@ export const getProjects = async (
   next: NextFunction
 ) => {
   try {
+    // Obtener el userId del query parameter
+    const userId = req.query.userId ? Number(req.query.userId) : null;
+    
     const projectRepository = AppDataSource.getRepository(Project);
-    const projects = await projectRepository.find({
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        startDate: true,
-        dueDate: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      relations: ['users', 'tasks', 'issues']
-    });
+    
+    let projects;
+    if (userId) {
+      // Filtrar proyectos por userId
+      projects = await projectRepository.find({
+        where: { userId },
+        relations: ['tasks', 'issues']
+      });
+    } else {
+      // Si no se proporciona userId, retornar todos (compatibilidad hacia atrás)
+      projects = await projectRepository.find({
+        relations: ['tasks', 'issues']
+      });
+    }
 
     res.status(200).json({ success: true, data: projects.map(serializeProject) });
   } catch (error) {
@@ -81,17 +85,27 @@ export const getProjectById = async (
 ) => {
   try {
     const { id } = req.params;
+    const userId = req.query.userId ? Number(req.query.userId) : null;
+    
     const projectRepository = AppDataSource.getRepository(Project);
 
     const project = await projectRepository.findOne({
       where: { id: Number(id) },
-      relations: ['users', 'tasks', 'tasks.assignedTo', 'issues', 'issues.assignedTo']
+      relations: ['tasks', 'issues']
     });
 
     if (!project) {
       return res.status(404).json({
         success: false,
         message: "Proyecto no encontrado",
+      });
+    }
+
+    // Si se proporciona userId, verificar que el proyecto pertenezca al usuario
+    if (userId && project.userId && project.userId !== userId) {
+      return res.status(403).json({
+        success: false,
+        message: "No tienes acceso a este proyecto",
       });
     }
 
@@ -116,35 +130,22 @@ export const createProject = async (
       description,
       startDate,
       dueDate,
-      userIds,
+      userId,
       tasks,
       issues
     } = req.body;
 
     // Validar campos requeridos
-    if (!title || !startDate || !dueDate) {
+    if (!title || !startDate || !dueDate || !userId) {
       return res.status(400).json({
         success: false,
-        message: "Título, fecha de inicio y fecha límite son requeridos",
+        message: "Título, fecha de inicio, fecha límite y userId son requeridos",
       });
     }
 
     const projectRepository = AppDataSource.getRepository(Project);
-    const userRepository = AppDataSource.getRepository(User);
     const taskRepository = AppDataSource.getRepository(Task);
     const issueRepository = AppDataSource.getRepository(Issue);
-
-    // Verificar que los usuarios existan si se proporcionan
-    let users: User[] = [];
-    if (userIds && userIds.length > 0) {
-      users = await userRepository.findByIds(userIds);
-      if (users.length !== userIds.length) {
-        return res.status(400).json({
-          success: false,
-          message: "Algunos usuarios no existen",
-        });
-      }
-    }
 
     // Crear el proyecto
     const newProject = projectRepository.create({
@@ -152,7 +153,7 @@ export const createProject = async (
       description,
       startDate: normalizeDateInput(startDate),
       dueDate: normalizeDateInput(dueDate),
-      users,
+      userId: Number(userId),
     });
 
     const savedProject = await projectRepository.save(newProject);
@@ -168,18 +169,6 @@ export const createProject = async (
           });
         }
 
-        // Verificar que el usuario asignado esté en el proyecto
-        if (taskData.assignedToId && !userIds.includes(taskData.assignedToId)) {
-          return res.status(400).json({
-            success: false,
-            message: `El usuario ${taskData.assignedToId} no está asignado al proyecto`,
-          });
-        }
-
-        const assignedUser = taskData.assignedToId 
-          ? await userRepository.findOne({ where: { id: taskData.assignedToId } })
-          : null;
-
         const newTask = taskRepository.create({
           title: taskData.title,
           description: taskData.description,
@@ -187,7 +176,6 @@ export const createProject = async (
           dueDate: normalizeDateInput(taskData.dueDate),
           status: taskData.status || TaskStatus.NEW,
           priority: taskData.priority || TaskPriority.MEDIUM,
-          ...(assignedUser && { assignedTo: assignedUser }),
           project: savedProject,
         });
 
@@ -206,18 +194,6 @@ export const createProject = async (
           });
         }
 
-        // Verificar que el usuario asignado esté en el proyecto
-        if (issueData.assignedToId && !userIds.includes(issueData.assignedToId)) {
-          return res.status(400).json({
-            success: false,
-            message: `El usuario ${issueData.assignedToId} no está asignado al proyecto`,
-          });
-        }
-
-        const assignedUser = issueData.assignedToId 
-          ? await userRepository.findOne({ where: { id: issueData.assignedToId } })
-          : null;
-
         const newIssue = issueRepository.create({
           title: issueData.title,
           description: issueData.description,
@@ -225,7 +201,6 @@ export const createProject = async (
           dueDate: normalizeDateInput(issueData.dueDate),
           status: issueData.status || TaskStatus.NEW,
           priority: issueData.priority || TaskPriority.MEDIUM,
-          ...(assignedUser && { assignedTo: assignedUser }),
           project: savedProject,
         });
 
@@ -236,7 +211,7 @@ export const createProject = async (
     // Obtener el proyecto con todas las relaciones
     const projectWithRelations = await projectRepository.findOne({
       where: { id: savedProject.id },
-      relations: ['users', 'tasks', 'tasks.assignedTo', 'issues', 'issues.assignedTo']
+      relations: ['tasks', 'issues']
     });
 
     return res.status(201).json({ success: true, message: "Proyecto creado exitosamente", data: projectWithRelations ? serializeProject(projectWithRelations) : null });
@@ -245,6 +220,7 @@ export const createProject = async (
     res.status(500).json({
       success: false,
       message: "Error al crear el proyecto",
+      error: error instanceof Error ? error.message : "Error desconocido",
     });
   }
 }; 
@@ -256,17 +232,16 @@ export const updateProject = async (
 ) => {
   try {
     const { id } = req.params;
-    const { title, description, startDate, dueDate, userIds } = req.body;
+    const { title, description, startDate, dueDate } = req.body;
 
     const projectRepository = AppDataSource.getRepository(Project);
-    const userRepository = AppDataSource.getRepository(User);
 
-    const project = await projectRepository.findOne({ where: { id: Number(id) }, relations: ["users"] });
+    const project = await projectRepository.findOne({ where: { id: Number(id) } });
     if (!project) {
       return res.status(404).json({ success: false, message: "Proyecto no encontrado" });
     }
 
-    if (!title && !description && !startDate && !dueDate && !userIds) {
+    if (!title && !description && !startDate && !dueDate) {
       return res.status(400).json({ success: false, message: "Debe proporcionar al menos un campo para actualizar" });
     }
 
@@ -275,19 +250,14 @@ export const updateProject = async (
     if (startDate) project.startDate = normalizeDateInput(startDate);
     if (dueDate) project.dueDate = normalizeDateInput(dueDate);
 
-    if (Array.isArray(userIds)) {
-      const users = await userRepository.findByIds(userIds);
-      if (users.length !== userIds.length) {
-        return res.status(400).json({ success: false, message: "Algunos usuarios no existen" });
-      }
-      project.users = users;
-    }
+    // No permitir modificar los usuarios del proyecto
+    // Los proyectos son de un único usuario y no se pueden cambiar
 
     await projectRepository.save(project);
 
     const projectWithRelations = await projectRepository.findOne({
       where: { id: project.id },
-      relations: ["users", "tasks", "tasks.assignedTo", "issues", "issues.assignedTo"],
+      relations: ["tasks", "issues"],
     });
 
     return res.status(200).json({ success: true, message: "Proyecto actualizado", data: projectWithRelations ? serializeProject(projectWithRelations) : null });
@@ -348,52 +318,28 @@ export const createProjectTask = async (
       dueDate,
       status,
       priority,
-      assignedToId,
     } = req.body;
 
     // Validaciones básicas
-    if (!title || !dueDate || !assignedToId) {
+    if (!title || !dueDate) {
       return res.status(400).json({
         success: false,
-        message: "Título, fecha límite y usuario asignado son requeridos",
+        message: "Título y fecha límite son requeridos",
       });
     }
 
     const projectRepository = AppDataSource.getRepository(Project);
-    const userRepository = AppDataSource.getRepository(User);
     const taskRepository = AppDataSource.getRepository(Task);
 
-    // Cargar proyecto con usuarios para validar pertenencia
+    // Verificar que el proyecto exista
     const project = await projectRepository.findOne({
       where: { id: Number(id) },
-      relations: ["users"],
     });
 
     if (!project) {
       return res.status(404).json({
         success: false,
         message: "Proyecto no encontrado",
-      });
-    }
-
-    // Verificar que el usuario exista
-    const assignedUser = await userRepository.findOne({
-      where: { id: Number(assignedToId) },
-    });
-
-    if (!assignedUser) {
-      return res.status(400).json({
-        success: false,
-        message: "El usuario asignado no existe",
-      });
-    }
-
-    // Validar que el usuario asignado pertenezca al proyecto
-    const projectUserIds = project.users.map((u) => u.id);
-    if (!projectUserIds.includes(Number(assignedToId))) {
-      return res.status(400).json({
-        success: false,
-        message: `El usuario ${assignedToId} no está asignado al proyecto`,
       });
     }
 
@@ -405,16 +351,15 @@ export const createProjectTask = async (
       dueDate: normalizeDateInput(dueDate),
       status: status || TaskStatus.NEW,
       priority: priority || TaskPriority.MEDIUM,
-      assignedTo: assignedUser,
       project,
     });
 
     const savedTask = await taskRepository.save(newTask);
 
-    // Recuperar con relaciones útiles
+    // Recuperar la tarea
     const taskWithRelations = await taskRepository.findOne({
       where: { id: savedTask.id },
-      relations: ["assignedTo"],
+      relations: ["project"],
     });
 
     return res.status(201).json({ success: true, message: "Tarea creada exitosamente en el proyecto", data: taskWithRelations ? { ...taskWithRelations, dueDate: toDateString(taskWithRelations.dueDate) } : null });
@@ -441,52 +386,28 @@ export const createProjectIssue = async (
       dueDate,
       status,
       priority,
-      assignedToId,
     } = req.body;
 
     // Validaciones básicas
-    if (!title || !dueDate || !assignedToId) {
+    if (!title || !dueDate) {
       return res.status(400).json({
         success: false,
-        message: "Título, fecha límite y usuario asignado son requeridos",
+        message: "Título y fecha límite son requeridos",
       });
     }
 
     const projectRepository = AppDataSource.getRepository(Project);
-    const userRepository = AppDataSource.getRepository(User);
     const issueRepository = AppDataSource.getRepository(Issue);
 
-    // Cargar proyecto con usuarios para validar pertenencia
+    // Verificar que el proyecto exista
     const project = await projectRepository.findOne({
       where: { id: Number(id) },
-      relations: ["users"],
     });
 
     if (!project) {
       return res.status(404).json({
         success: false,
         message: "Proyecto no encontrado",
-      });
-    }
-
-    // Verificar que el usuario exista
-    const assignedUser = await userRepository.findOne({
-      where: { id: Number(assignedToId) },
-    });
-
-    if (!assignedUser) {
-      return res.status(400).json({
-        success: false,
-        message: "El usuario asignado no existe",
-      });
-    }
-
-    // Validar que el usuario asignado pertenezca al proyecto
-    const projectUserIds = project.users.map((u) => u.id);
-    if (!projectUserIds.includes(Number(assignedToId))) {
-      return res.status(400).json({
-        success: false,
-        message: `El usuario ${assignedToId} no está asignado al proyecto`,
       });
     }
 
@@ -498,16 +419,15 @@ export const createProjectIssue = async (
       dueDate: normalizeDateInput(dueDate),
       status: status || TaskStatus.NEW,
       priority: priority || TaskPriority.MEDIUM,
-      assignedTo: assignedUser,
       project,
     });
 
     const savedIssue = await issueRepository.save(newIssue);
 
-    // Recuperar con relaciones útiles
+    // Recuperar la issue
     const issueWithRelations = await issueRepository.findOne({
       where: { id: savedIssue.id },
-      relations: ["assignedTo"],
+      relations: ["project"],
     });
 
     return res.status(201).json({ success: true, message: "Issue creada exitosamente en el proyecto", data: issueWithRelations ? { ...issueWithRelations, dueDate: toDateString(issueWithRelations.dueDate) } : null });

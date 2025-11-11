@@ -1,5 +1,4 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
-import { User } from './user';
 import { TaskPriority, TaskStatus } from '../interfaces/task';
 import { Project } from './project';
 
@@ -12,7 +11,7 @@ export class Task {
     @Column()
     title: string;
 
-    @Column({ nullable: true })
+    @Column({ nullable: true, type: 'varchar', length: 500 })
     description: string;
     
     @Column({ nullable: true })
@@ -34,10 +33,6 @@ export class Task {
         default: TaskPriority.MEDIUM
     })
     priority: TaskPriority;
-
-    @ManyToOne(() => User)
-    @JoinColumn({ name: "assigned_to_id" })
-    assignedTo: User;
 
     @ManyToOne(() => Project, project => project.tasks)
     @JoinColumn({ name: "project_id" })

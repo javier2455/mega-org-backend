@@ -4,11 +4,8 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
-  ManyToMany,
   OneToMany,
-  JoinTable,
 } from "typeorm";
-import { User } from "./user";
 import { Task } from "./task";
 import { Issue } from "./issues";
 
@@ -29,13 +26,8 @@ export class Project {
   @Column({ type: "date" })
   dueDate: string;
 
-  @ManyToMany(() => User)
-  @JoinTable({
-    name: "project_users",
-    joinColumn: { name: "project_id", referencedColumnName: "id" },
-    inverseJoinColumn: { name: "user_id", referencedColumnName: "id" },
-  })
-  users: User[];
+  @Column({ name: "user_id", nullable: true })
+  userId?: number;
 
   @OneToMany(() => Task, (task) => task.project)
   tasks: Task[];
