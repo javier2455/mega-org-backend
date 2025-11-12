@@ -70,10 +70,14 @@ export const getProjects = async (
     res.status(200).json({ success: true, data: projects.map(serializeProject) });
   } catch (error) {
     console.error("Error al obtener proyectos:", error);
+    const errorMessage = error instanceof Error ? error.message : "Error desconocido";
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Error stack:", errorStack);
     res.status(500).json({
       success: false,
       message: "Error al obtener los proyectos",
-      message2: error instanceof Error ? error.message : "Error desconocido",
+      error: errorMessage,
+      ...(process.env.NODE_ENV === "development" && { stack: errorStack }),
     });
   }
 };

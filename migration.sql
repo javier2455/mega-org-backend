@@ -1,4 +1,4 @@
--- Script de migración para agregar user_id a la tabla project
+-- Script de migración para PostgreSQL
 -- Ejecutar este script manualmente en la base de datos antes de reiniciar el servidor
 
 -- Paso 1: Agregar la columna user_id como nullable
@@ -24,4 +24,3 @@ ALTER TABLE "issue" DROP COLUMN IF EXISTS "assigned_to_id";
 
 -- Paso 6: Eliminar tabla de relación project_users si existe
 DROP TABLE IF EXISTS "project_users";
-
