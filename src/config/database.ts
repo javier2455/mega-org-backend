@@ -8,7 +8,7 @@ const isProd = process.env.NODE_ENV === "production";
 
 // Configuración de la base de datos
 export const AppDataSource = new DataSource({
-  type: "postgres",
+  type: isProd ? "mysql" : "postgres",
   host: process.env.DB_HOST || "localhost",
   port: parseInt(process.env.DB_PORT || "5432"),
   username: process.env.DB_USER || "postgres",
