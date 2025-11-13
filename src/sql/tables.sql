@@ -1,14 +1,3 @@
--- Crear la tabla de usuarios
-CREATE TABLE "user" (
-    "id" SERIAL PRIMARY KEY,
-    "user" VARCHAR UNIQUE NOT NULL,
-    "password" VARCHAR NOT NULL,
-    "role" ENUM('user', 'admin', 'maintainer') DEFAULT 'user',
-    "active" BOOLEAN DEFAULT true,
-    "createdAt" TIMESTAMP DEFAULT now(),
-    "updatedAt" TIMESTAMP DEFAULT now()
-);
-
 -- Crear los tipos ENUM para las tareas
 CREATE TYPE "task_status_enum" AS ENUM('new', 'in_progress', 'completed', 'in_review', 'closed');
 CREATE TYPE "task_priority_enum" AS ENUM('low', 'medium', 'high', 'urgent');

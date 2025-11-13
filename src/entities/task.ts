@@ -34,7 +34,7 @@ export class Task {
     })
     priority: TaskPriority;
 
-    @ManyToOne(() => Project, project => project.tasks)
+    @ManyToOne(() => Project, project => project.tasks, { onDelete: 'CASCADE' })
     @JoinColumn({ name: "project_id" })
     project: Project;
 

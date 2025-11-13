@@ -26,8 +26,8 @@ export class Project {
   @Column({ type: "date" })
   dueDate: string;
 
-  @Column({ name: "user_id", nullable: true })
-  userId?: number;
+  @Column({ name: "user_id" })
+  userId: number;
 
   @OneToMany(() => Task, (task) => task.project)
   tasks: Task[];
